@@ -139,3 +139,91 @@ owid-energy-data.csv          ← primary (iso_code + year)
 ```
 
 This multi-dataset join satisfies the **HD enrichment requirement** of AT3: the merged dataset spans temporal (2000–2024), spatial (220 countries), physical (GHI/PVOUT), economic (GDP, tariffs), and technology (PV prices) dimensions — no single source provides all five.
+
+---
+
+## Data Dictionary
+
+Variable-level definitions for the key analytical outputs. All variables appear in `solar_merged_dataset.csv`; starred (★) variables also appear in `solar_market_opportunity.csv`.
+
+### Identity & Temporal
+
+| Variable | Type | Unit | Definition | Source |
+|---|---|---|---|---|
+| `iso_code` ★ | string | — | ISO 3166-1 alpha-3 country code (join key) | OWID energy data |
+| `country` ★ | string | — | Country or region name | OWID energy data |
+| `year` | integer | — | Calendar year (2000–2024) | OWID energy data |
+
+### Solar Generation & Capacity
+
+| Variable | Type | Unit | Definition | Source |
+|---|---|---|---|---|
+| `solar_electricity` | float | TWh | Total solar electricity generated per year | OWID energy data (IEA/Ember) |
+| `solar_share_elec` | float | % | Solar electricity as a share of total electricity generation | OWID energy data |
+| `solar_capacity` | float | GW | Cumulative installed solar PV capacity (end-of-year) | IRENA (2025) via OWID |
+| `solar_pv_price` | float | USD/W | Solar PV module cost, inflation-adjusted to 2023 USD | IRENA / Nemet / Farmer & Lafond via OWID |
+
+### Physical Potential (static, country-level)
+
+| Variable | Type | Unit | Definition | Source |
+|---|---|---|---|---|
+| `PVOUT` ★ | float | kWh/kWp/day | Specific PV power output — energy a 1 kWp system produces per day under local irradiance conditions | Solargis / World Bank ESMAP (2020) |
+| `GHI` | float | kWh/m²/day | Global Horizontal Irradiance — total solar radiation reaching a horizontal surface per day | Solargis / World Bank ESMAP (2020) |
+| `LCOE` | float | USD/kWh | Levelised Cost of Energy for utility-scale solar PV | Solargis / World Bank ESMAP (2020) |
+| `ELECTARIFF` | float | USD/kWh | Average local retail electricity tariff | Solargis / World Bank ESMAP (2020) |
+
+### Economic Context
+
+| Variable | Type | Unit | Definition | Source |
+|---|---|---|---|---|
+| `GDP_per_capita` ★ | float | USD | GDP per capita (current USD) — proxy for market affordability and grid investment capacity | World Bank WDI (2024) via OWID |
+| `primary_energy_consumption` | float | TWh | Total primary energy consumption per year — proxy for overall energy demand | OWID energy data (EIA/BP) |
+
+### Derived Metrics
+
+| Variable | Type | Unit | Definition | Calculation |
+|---|---|---|---|---|
+| `capacity_util_factor` ★ | float | ratio (0–1) | Actual solar electricity generation as a fraction of theoretical maximum capacity output | `solar_electricity / (solar_capacity × 8.760)` (GW → TWh via 8,760 h/yr) |
+| `solar_cagr_5yr` ★ | float | decimal (e.g. 0.12 = 12%) | 5-year compound annual growth rate of solar electricity generation | `(solar_electricity_t / solar_electricity_t-5)^(1/5) − 1` |
+| `untapped_potential` ★ | float | ratio | Gap between physical resource (normalised PVOUT) and current utilisation (capacity_util_factor) — higher = more room to grow | `norm(PVOUT) − norm(capacity_util_factor)` |
+
+### Normalised Sub-scores (`solar_market_opportunity.csv` only)
+
+All sub-scores are min–max normalised to [0, 1] across the 2024 country snapshot.
+
+| Variable | Type | Unit | Definition | Weight in composite |
+|---|---|---|---|---|
+| `score_pvout` ★ | float | 0–1 | Normalised PVOUT (physical resource quality) | 25% |
+| `score_untapped` ★ | float | 0–1 | Normalised untapped potential | 25% |
+| `score_demand` ★ | float | 0–1 | Normalised primary energy consumption (market size) | 20% |
+| `score_cagr` ★ | float | 0–1 | Normalised 5-year solar CAGR (growth momentum) | 20% |
+| `score_gdp` ★ | float | 0–1 | Normalised GDP per capita (investment readiness) | 10% |
+| `opportunity_score` ★ | float | 0–1 | **Composite weighted score** = 0.25 × score_pvout + 0.25 × score_untapped + 0.20 × score_demand + 0.20 × score_cagr + 0.10 × score_gdp | — |
+
+---
+
+## Credits
+
+### Data Sources
+
+| Dataset | Publisher | Licence | Retrieved |
+|---|---|---|---|
+| [OWID Energy Data](https://github.com/owid/energy-data) — primary dataset covering solar generation, solar share, and energy consumption by country/year | Our World in Data (Ritchie, Rosado, Roser et al., 2023) | CC BY 4.0 | April 2026 |
+| [Installed Solar PV Capacity](https://ourworldindata.org/grapher/installed-solar-pv-capacity) — cumulative installed capacity by country/year | IRENA (2025) via Our World in Data | CC BY 4.0 | April 2026 |
+| [Solar PV Module Prices](https://ourworldindata.org/grapher/solar-pv-prices) — inflation-adjusted module cost, 1975–2024 | IRENA / Nemet (2009) / Farmer & Lafond (2016) via Our World in Data | CC BY 4.0 | April 2026 |
+| [Global Solar Atlas Country Rankings](https://datacatalog.worldbank.org/dataset/solar-photovoltaic-power-potential-country) — PVOUT, GHI, LCOE, electricity tariffs by country | Solargis / World Bank ESMAP (2020) | CC BY 4.0 | April 2026 |
+
+### APA 7th References
+
+Ritchie, H., Rosado, P., & Roser, M. (2023). *Energy*. Our World in Data. https://github.com/owid/energy-data
+
+IRENA. (2025). *Renewable power generation costs in 2024*. International Renewable Energy Agency. https://ourworldindata.org/grapher/installed-solar-pv-capacity
+
+Solargis & World Bank ESMAP. (2020). *Global photovoltaic power potential by country*. World Bank Open Data. https://datacatalog.worldbank.org/dataset/solar-photovoltaic-power-potential-country
+
+### Individual Contribution
+
+This repository represents the **data preparation and analysis** contribution of **Ricki Yang (Yizhuo Yang)** to UTS 36104 AT3, Group 17 (2026). Responsibilities: dataset sourcing, multi-dataset join design, derived metric computation (CAGR, capacity utilisation, composite opportunity score), and CSV output generation for the group's Streamlit dashboard.
+
+Group Streamlit Dashboard: https://solar-expansion.streamlit.app/  
+Group GitHub (frontend): https://github.com/prathameshn21/DVN_Assignment3
